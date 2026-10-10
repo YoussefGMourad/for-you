@@ -97,7 +97,7 @@
 <script>
 // Results are emailed to you through FormSubmit (free, no account).
 // Put your email here. The first submission sends you an activation email — click it once.
-const RESULTS_EMAIL = "YOUR_EMAIL_HERE";
+const RESULTS_EMAIL = "usfgalal04@gmail.com";
 
 const QUESTIONS = [
   { q: "Which planet is known as the Red Planet?", a: ["Venus", "Mars", "Jupiter", "Saturn"], c: 1 },
@@ -226,10 +226,11 @@ async function save() {
         Correct: correct + " / " + QUESTIONS.length, Title: title(score)
       })
     });
-    if (!r.ok) throw new Error(r.status);
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || String(data.success) !== "true") throw new Error(data.message || ("HTTP " + r.status));
     status.textContent = "Score saved, " + name + "! 🎉";
-  } catch {
-    status.innerHTML = 'Couldn\'t save your score. <button id="retry" style="padding:6px 12px">Try again</button>';
+  } catch (e) {
+    status.innerHTML = 'Couldn\'t save your score. <button id="retry" style="padding:6px 12px">Try again</button><br><small style="font-weight:400;color:var(--soft)">' + esc(e.message || "") + '</small>';
     document.getElementById("retry").onclick = () => { status.textContent = "Saving your score…"; save(); };
   }
 }
