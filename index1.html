@@ -425,6 +425,20 @@
   }
   btn.addEventListener("click", () => playing ? pause() : play());
 
+  // Stop the music when she leaves the page (switches app, locks phone, changes tab),
+  // and resume when she comes back, if it was playing.
+  let resumeOnReturn = false;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      resumeOnReturn = playing;
+      if (playing) pause();
+    } else if (resumeOnReturn) {
+      resumeOnReturn = false;
+      play();
+    }
+  });
+  addEventListener("pagehide", () => { if (playing) pause(); });
+
   function open() {
     if (stage.classList.contains("opening")) return;
     btn.hidden = false;
