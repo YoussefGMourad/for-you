@@ -173,7 +173,21 @@
   .replay { display: block; margin: 28px auto 0; font: inherit; font-size: .72rem; letter-spacing: .3em; text-transform: uppercase; background: none; border: 0; color: #9a7a3e; cursor: pointer; padding: 8px; }
   .replay:focus-visible { outline: 1px solid #9a7a3e; }
 
-  /* small visible YouTube player (YouTube requires the player to stay visible) */
+  /* the song card inside the letter */
+  .song { margin: 22px auto 0; max-width: 360px; display: grid; gap: 10px; }
+  .song-label { text-align: center; font-size: .78rem; letter-spacing: .22em; text-transform: uppercase; color: #9a7a3e; }
+  .song-label.nudge { color: var(--rose); animation: nudge 1.4s ease-in-out infinite; }
+  @keyframes nudge { 50% { transform: scale(1.06); } }
+  .song-frame {
+    position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%;
+    border-radius: 10px; overflow: hidden;
+    border: 1px solid rgba(185,146,78,.6);
+    box-shadow: 0 14px 30px -14px rgba(42,31,45,.6);
+    background: #1a1222;
+  }
+  .song-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+  /* (old floating player, unused) */
   .yt-wrap {
     position: fixed; z-index: 5;
     left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
@@ -217,8 +231,6 @@
 </head>
 <body>
 <canvas id="sky" aria-hidden="true"></canvas>
-<div class="yt-wrap" id="ytWrap"><div id="yt"></div></div>
-<button class="music" id="music" aria-label="Play or pause music" hidden><span class="bars"><i></i><i></i><i></i><i></i></span></button>
 
 <main class="stage" id="stage">
   <div class="envelope-wrap" id="envWrap">
@@ -237,6 +249,11 @@
     <p class="kicker reveal">Private VIP Invitation</p>
     <h1 class="reveal">Top Secret<br>Birthday Mission</h1>
     <p class="to reveal">To the Birthday Girl 👑</p>
+
+    <div class="song reveal" id="song">
+      <p class="song-label" id="songLabel">🎵 Press play, our song is waiting</p>
+      <div class="song-frame"><div id="yt"></div></div>
+    </div>
 
     <div class="rule reveal"><svg width="18" height="16" viewBox="0 0 18 16" aria-hidden="true"><path d="M9 15C3.5 11 1 8 1 5a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 3-2.5 6-8 10z" fill="#b8485e"/></svg></div>
 
@@ -341,23 +358,27 @@
       p.addEventListener("animationend", () => p.remove());
     }
   }
-  /* ---------- Music ----------
-     Plays the YouTube song (from START seconds, looping).
-     If YouTube can't load, plays a soft music-box melody made in the browser. */
+  /* ---------- Music: Amr Diab from YouTube ----------
+     The player sits inside the letter. On the seal tap we try to start it
+     (works on computers and many Androids). If the phone blocks that,
+     the label pulses and she taps ▶ on the player herself. */
   const VIDEO_ID = "a_vfYHbLr7Y";
   const START = 39;
-  const btn = document.getElementById("music");
-  const ytWrap = document.getElementById("ytWrap");
-  let yt = null, ytReady = false, mode = null, playing = false, actx = null, master = null, loopTimer = null;
+  const label = document.getElementById("songLabel");
+  let yt = null, ytReady = false, playing = false, wantPlay = false;
 
   window.onYouTubeIframeAPIReady = () => {
     yt = new YT.Player("yt", {
-      width: 160, height: 90, videoId: VIDEO_ID,
-      playerVars: { start: START, playsinline: 1, controls: 0, rel: 0, modestbranding: 1, disablekb: 1 },
+      videoId: VIDEO_ID,
+      playerVars: { start: START, playsinline: 1, controls: 1, rel: 0, modestbranding: 1 },
       events: {
-        onReady: () => { ytReady = true; },
-        onStateChange: e => { if (e.data === YT.PlayerState.ENDED) { yt.seekTo(START, true); yt.playVideo(); } },
-        onError: () => { ytReady = false; ytWrap.classList.remove("show"); if (playing && mode === "yt") { mode = "synth"; startSynth(); } }
+        onReady: () => { ytReady = true; if (wantPlay) tryPlay(); },
+        onStateChange: e => {
+          playing = e.data === YT.PlayerState.PLAYING;
+          if (playing) { label.classList.remove("nudge"); label.textContent = "🎵 Our song"; }
+          if (e.data === YT.PlayerState.ENDED) { yt.seekTo(START, true); yt.playVideo(); }
+        },
+        onError: () => { label.textContent = "🎵 Song couldn't load"; }
       }
     });
   };
@@ -365,84 +386,20 @@
   ytScript.src = "https://www.youtube.com/iframe_api";
   document.head.appendChild(ytScript);
 
-  // Original gentle waltz in C major: [note, beats]
-  const N = { G3:196, C4:261.63, D4:293.66, E4:329.63, F4:349.23, G4:392, A4:440, B4:493.88, C5:523.25, D5:587.33, E5:659.25, F5:698.46, G5:783.99 };
-  const melody = [
-    ["E5",1],["G5",1],["E5",1], ["D5",2],["C5",1], ["D5",1],["E5",1],["G4",1], ["C5",3],
-    ["A4",1],["C5",1],["E5",1], ["D5",2],["B4",1], ["C5",1],["D5",1],["E5",1], ["G4",3],
-    ["E5",1],["G5",1],["E5",1], ["F5",2],["D5",1], ["E5",1],["D5",1],["B4",1], ["C5",3]
-  ];
-  const bass = ["C4","A4","F4","G4","C4","G3","F4","C4","A4","F4","G4","C4"];
-  const BEAT = 0.52;
+  function tryPlay() {
+    if (!ytReady) { wantPlay = true; return; }
+    yt.playVideo();
+    // If the phone blocked it, ask her to tap play on the player.
+    setTimeout(() => { if (!playing) label.classList.add("nudge"); }, 2500);
+  }
 
-  function pluck(freq, t, dur, vol) {
-    const o = actx.createOscillator(), o2 = actx.createOscillator(), g = actx.createGain();
-    o.type = "sine"; o2.type = "triangle";
-    o.frequency.value = freq; o2.frequency.value = freq * 2;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
-    const g2 = actx.createGain(); g2.gain.value = 0.25;
-    o.connect(g); o2.connect(g2); g2.connect(g); g.connect(master);
-    o.start(t); o2.start(t); o.stop(t + dur + .05); o2.stop(t + dur + .05);
-  }
-  function scheduleLoop() {
-    let t = actx.currentTime + 0.1, total = 0;
-    for (const [n, b] of melody) { pluck(N[n], t + total * BEAT, b * BEAT + 1.2, 0.18); total += b; }
-    bass.forEach((n, k) => pluck(N[n] / 2, t + k * 3 * BEAT, 3 * BEAT + 0.8, 0.09));
-    loopTimer = setTimeout(scheduleLoop, total * BEAT * 1000);
-  }
-  function startSynth() {
-    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-    if (!master) {
-      master = actx.createGain(); master.gain.value = 0;
-      const delay = actx.createDelay(); delay.delayTime.value = 0.28;
-      const fb = actx.createGain(); fb.gain.value = 0.28;
-      master.connect(actx.destination); master.connect(delay); delay.connect(fb); fb.connect(delay); delay.connect(actx.destination);
-    }
-    actx.resume();
-    master.gain.cancelScheduledValues(actx.currentTime);
-    master.gain.linearRampToValueAtTime(0.9, actx.currentTime + 1.5);
-    if (!loopTimer) scheduleLoop();
-  }
-  function stopSynth() {
-    if (!actx) return;
-    master.gain.linearRampToValueAtTime(0, actx.currentTime + 0.6);
-    clearTimeout(loopTimer); loopTimer = null;
-  }
-  function play() {
-    if (ytReady) {
-      mode = "yt";
-      ytWrap.classList.add("show");
-      yt.setVolume(0); yt.playVideo();
-      let v = 0; const id = setInterval(() => { v = Math.min(80, v + 5); yt.setVolume(v); if (v >= 80) clearInterval(id); }, 120);
-    } else { mode = "synth"; startSynth(); }
-    playing = true; btn.classList.add("playing");
-  }
-  function pause() {
-    mode === "yt" ? yt.pauseVideo() : stopSynth();
-    playing = false; btn.classList.remove("playing");
-  }
-  btn.addEventListener("click", () => playing ? pause() : play());
-
-  // Stop the music when she leaves the page (switches app, locks phone, changes tab),
-  // and resume when she comes back, if it was playing.
-  let resumeOnReturn = false;
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) {
-      resumeOnReturn = playing;
-      if (playing) pause();
-    } else if (resumeOnReturn) {
-      resumeOnReturn = false;
-      play();
-    }
-  });
-  addEventListener("pagehide", () => { if (playing) pause(); });
+  // Stop the song when she leaves the page (switches app, locks phone, changes tab).
+  document.addEventListener("visibilitychange", () => { if (document.hidden && ytReady && playing) yt.pauseVideo(); });
+  addEventListener("pagehide", () => { if (ytReady && playing) yt.pauseVideo(); });
 
   function open() {
     if (stage.classList.contains("opening")) return;
-    btn.hidden = false;
-    play();
+    tryPlay();
     stagger();
     stage.classList.add("opening");
     setTimeout(() => {
@@ -454,6 +411,7 @@
   }
   env.addEventListener("click", open);
   document.getElementById("replay").addEventListener("click", () => {
+    if (ytReady && playing) yt.pauseVideo();
     stage.classList.remove("shown", "opened", "opening");
     scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
   });
