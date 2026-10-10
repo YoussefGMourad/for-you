@@ -95,10 +95,6 @@
 <main class="card" id="app" aria-live="polite"></main>
 
 <script>
-// Results are emailed to you through FormSubmit (free, no account).
-// Put your email here. The first submission sends you an activation email — click it once.
-const RESULTS_EMAIL = "usfgalal04@gmail.com";
-
 const QUESTIONS = [
   { q: "Which planet is known as the Red Planet?", a: ["Venus", "Mars", "Jupiter", "Saturn"], c: 1 },
   { q: "How many hearts does an octopus have?", a: ["1", "2", "3", "4"], c: 2 },
@@ -117,7 +113,6 @@ const SPEED = 10;         // bonus per second left
 const STREAK = 25;        // bonus per answer in a streak
 
 let idx = 0, score = 0, streak = 0, correct = 0, timer = null, left = TIME;
-let player = { name: "", email: "" };
 const app = document.getElementById("app");
 
 function title(s) {
@@ -132,27 +127,10 @@ function start() {
     <div class="pop" style="display:grid;gap:14px">
       <h1>Sweet Trivia 🍬</h1>
       <p class="sub">10 quick questions. 10 seconds each. Answer fast for bonus points and keep your streak alive.</p>
-      <form id="f" novalidate>
-        <div><label for="name">Your name</label><input id="name" autocomplete="name" placeholder="Name for the leaderboard" value="${esc(player.name)}"></div>
-        <div><label for="email">Your email</label><input id="email" type="email" autocomplete="email" placeholder="you@example.com" value="${esc(player.email)}"></div>
-        <p class="err" id="err"></p>
-        <button class="primary" id="go">Play</button>
-        <p class="note">Your name, email and score are sent to the person who shared this game with you.</p>
-      </form>
+      <button class="primary" id="go">Play</button>
     </div>`;
-  document.getElementById("f").onsubmit = e => {
-    e.preventDefault();
-    const name = document.getElementById("name").value.trim();
-    const email = document.getElementById("email").value.trim();
-    const err = document.getElementById("err");
-    if (!name) { err.textContent = "Add your name first."; return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = "That email doesn't look right. Check it again?"; return; }
-    player = { name, email };
-    idx = 0; score = 0; streak = 0; correct = 0; ask();
-  };
+  document.getElementById("go").onclick = () => { idx = 0; score = 0; streak = 0; correct = 0; ask(); };
 }
-
-function esc(t) { return String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
 function ask() {
   const Q = QUESTIONS[idx];
@@ -204,35 +182,9 @@ function finish() {
       <div class="big">${score}</div>
       <span class="badge">${title(score)}</span>
       <p class="sub">${correct} of ${QUESTIONS.length} right</p>
-      <p class="feedback" id="saved">Saving your score…</p>
       <button class="primary" id="again">Play again</button>
     </div>`;
   document.getElementById("again").onclick = start;
-  save();
-}
-
-async function save() {
-  const { name, email } = player;
-  const status = document.getElementById("saved");
-  try {
-    const r = await fetch("https://formsubmit.co/ajax/" + RESULTS_EMAIL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify({
-        _subject: "Sweet Trivia: new score from " + name,
-        _template: "table",
-        _captcha: "false",
-        Name: name, Email: email, Score: score,
-        Correct: correct + " / " + QUESTIONS.length, Title: title(score)
-      })
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok || String(data.success) !== "true") throw new Error(data.message || ("HTTP " + r.status));
-    status.textContent = "Score saved, " + name + "! 🎉";
-  } catch (e) {
-    status.innerHTML = 'Couldn\'t save your score. <button id="retry" style="padding:6px 12px">Try again</button><br><small style="font-weight:400;color:var(--soft)">' + esc(e.message || "") + '</small>';
-    document.getElementById("retry").onclick = () => { status.textContent = "Saving your score…"; save(); };
-  }
 }
 
 start();
