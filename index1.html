@@ -187,6 +187,17 @@
   }
   .song-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 
+  .song-pill {
+    position: fixed; z-index: 6; left: 50%; transform: translateX(-50%);
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    font: inherit; font-size: .85rem; font-weight: 500; letter-spacing: .06em;
+    padding: 12px 20px; border-radius: 999px; cursor: pointer;
+    background: var(--rose); color: #fff; border: 1px solid var(--gold-hi);
+    box-shadow: 0 10px 30px -8px rgba(0,0,0,.7);
+    animation: nudge 1.6s ease-in-out infinite;
+  }
+  .song-pill:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+
   /* (old floating player, unused) */
   .yt-wrap {
     position: fixed; z-index: 5;
@@ -232,6 +243,8 @@
 <body>
 <canvas id="sky" aria-hidden="true"></canvas>
 
+<button class="song-pill" id="songPill" hidden>🎵 Tap to play our song</button>
+
 <main class="stage" id="stage">
   <div class="envelope-wrap" id="envWrap">
     <div class="eyebrow">Private &amp; Confidential</div>
@@ -249,11 +262,6 @@
     <p class="kicker reveal">Private VIP Invitation</p>
     <h1 class="reveal">Top Secret<br>Birthday Mission</h1>
     <p class="to reveal">To the Birthday Girl 👑</p>
-
-    <div class="song reveal" id="song">
-      <p class="song-label" id="songLabel">🎵 Press play, our song is waiting</p>
-      <div class="song-frame"><div id="yt"></div></div>
-    </div>
 
     <div class="rule reveal"><svg width="18" height="16" viewBox="0 0 18 16" aria-hidden="true"><path d="M9 15C3.5 11 1 8 1 5a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 3-2.5 6-8 10z" fill="#b8485e"/></svg></div>
 
@@ -303,6 +311,11 @@
     </div>
 
     <p class="ps reveal"><b>P.S.</b><br>No spoilers. No guessing.<br>Just dress pretty and trust me. 😌❤️</p>
+
+    <div class="song reveal" id="song">
+      <p class="song-label" id="songLabel">🎵 Our song</p>
+      <div class="song-frame"><div id="yt"></div></div>
+    </div>
 
     <button class="replay reveal" id="replay">Seal it again</button>
   </article>
@@ -375,7 +388,7 @@
         onReady: () => { ytReady = true; if (wantPlay) tryPlay(); },
         onStateChange: e => {
           playing = e.data === YT.PlayerState.PLAYING;
-          if (playing) { label.classList.remove("nudge"); label.textContent = "🎵 Our song"; }
+          if (playing) { label.classList.remove("nudge"); pill.hidden = true; }
           if (e.data === YT.PlayerState.ENDED) { yt.seekTo(START, true); yt.playVideo(); }
         },
         onError: () => { label.textContent = "🎵 Song couldn't load"; }
@@ -386,12 +399,19 @@
   ytScript.src = "https://www.youtube.com/iframe_api";
   document.head.appendChild(ytScript);
 
+  const pill = document.getElementById("songPill");
   function tryPlay() {
     if (!ytReady) { wantPlay = true; return; }
     yt.playVideo();
-    // If the phone blocked it, ask her to tap play on the player.
-    setTimeout(() => { if (!playing) label.classList.add("nudge"); }, 2500);
+    // If the phone blocked autoplay, show a floating button that takes her
+    // down to the player so she can tap ▶ (phones always allow that tap).
+    setTimeout(() => { if (!playing) { label.classList.add("nudge"); label.textContent = "🎵 Tap ▶ to play our song"; pill.hidden = false; } }, 4000);
   }
+  pill.addEventListener("click", () => {
+    pill.hidden = true;
+    if (ytReady) yt.playVideo();
+    document.getElementById("song").scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+  });
 
   // Stop the song when she leaves the page (switches app, locks phone, changes tab).
   document.addEventListener("visibilitychange", () => { if (document.hidden && ytReady && playing) yt.pauseVideo(); });
@@ -412,6 +432,7 @@
   env.addEventListener("click", open);
   document.getElementById("replay").addEventListener("click", () => {
     if (ytReady && playing) yt.pauseVideo();
+    pill.hidden = true;
     stage.classList.remove("shown", "opened", "opening");
     scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
   });
